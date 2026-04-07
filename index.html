@@ -416,7 +416,7 @@ function onToken(resp) {
   fetchUserInfo();
   document.getElementById('login-screen').style.display = 'none';
   document.getElementById('app').classList.add('active');
-  loadFiles();
+  await navigateToDocsFolder();
 }
 
 async function fetchUserInfo() {
@@ -442,6 +442,27 @@ function signOut() {
   breadcrumb = [{ id: 'root', name: 'マイドライブ' }];
   document.getElementById('app').classList.remove('active');
   document.getElementById('login-screen').style.display = 'flex';
+}
+
+// 「Googleドキュメント」フォルダを探して移動
+async function navigateToDocsFolder() {
+  try {
+    const p = new URLSearchParams({
+      q: "name = 'Googleドキュメント' and mimeType = 'application/vnd.google-apps.folder' and trashed = false",
+      fields: 'files(id,name)',
+      pageSize: '1'
+    });
+    const data = await api(`files?${p}`);
+    if (data?.files?.length) {
+      const folder = data.files[0];
+      currentFolderId = folder.id;
+      breadcrumb = [
+        { id: 'root', name: 'マイドライブ' },
+        { id: folder.id, name: folder.name }
+      ];
+    }
+  } catch {}
+  loadFiles();
 }
 
 // Drive API
@@ -692,20 +713,4 @@ function showToast(msg) {
 }
 
 // キーボード操作
-document.addEventListener('keydown', e => {
-  if (e.key === 'Enter') {
-    if (!document.getElementById('modal-create-doc').classList.contains('hidden')) createDoc();
-    else if (!document.getElementById('modal-create-folder').classList.contains('hidden')) createFolder();
-  }
-  if (e.key === 'Escape') {
-    ['modal-create-doc','modal-create-folder','modal-move'].forEach(closeModal);
-  }
-});
-document.querySelectorAll('.modal-overlay').forEach(o => {
-  o.addEventListener('click', e => {
-    if (e.target === o) ['modal-create-doc','modal-create-folder','modal-move'].forEach(closeModal);
-  });
-});
-</script>
-</body>
-</html>
+document.addEventListener('keydown', 
