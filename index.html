@@ -1,0 +1,701 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ドライブマネージャー</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Helvetica Neue', Arial, 'Hiragino Sans', 'Meiryo', sans-serif;
+      background: #f8f9fa;
+      color: #333;
+      min-height: 100vh;
+    }
+
+    /* Login */
+    #login-screen {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+    }
+    .login-card {
+      background: white;
+      padding: 48px 40px;
+      border-radius: 16px;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.1);
+      text-align: center;
+      width: 90%;
+      max-width: 400px;
+    }
+    .login-card .logo { font-size: 52px; margin-bottom: 16px; }
+    .login-card h1 { font-size: 22px; color: #1a73e8; margin-bottom: 8px; }
+    .login-card p { color: #666; font-size: 14px; margin-bottom: 32px; line-height: 1.6; }
+
+    /* Buttons */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 18px;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 500;
+      transition: background 0.15s, box-shadow 0.15s;
+      white-space: nowrap;
+    }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-primary { background: #1a73e8; color: white; }
+    .btn-primary:hover:not(:disabled) { background: #1557b0; }
+    .btn-secondary { background: white; color: #333; border: 1px solid #ddd; }
+    .btn-secondary:hover { background: #f5f5f5; }
+    .btn-icon {
+      padding: 7px 9px;
+      background: transparent;
+      color: #666;
+      border-radius: 6px;
+      font-size: 16px;
+      line-height: 1;
+    }
+    .btn-icon:hover { background: #f0f0f0; }
+
+    /* App */
+    #app { display: none; min-height: 100vh; flex-direction: column; }
+    #app.active { display: flex; }
+
+    /* Header */
+    .header {
+      background: white;
+      border-bottom: 1px solid #e0e0e0;
+      padding: 12px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+    }
+    .header-left { display: flex; align-items: center; gap: 10px; }
+    .header-logo { font-size: 26px; }
+    .header h1 { font-size: 18px; color: #1a73e8; font-weight: 700; }
+    .header-right { display: flex; align-items: center; gap: 12px; }
+    .user-email { font-size: 13px; color: #666; max-width: 200px; overflow: hidden; text-overflow: ellipsis; }
+
+    /* Toolbar */
+    .toolbar {
+      background: white;
+      border-bottom: 1px solid #e0e0e0;
+      padding: 10px 24px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .toolbar-spacer { flex: 1; }
+    .sort-label { font-size: 13px; color: #666; }
+    .sort-select {
+      padding: 7px 12px;
+      border: 1px solid #ddd;
+      border-radius: 7px;
+      font-size: 13px;
+      background: white;
+      cursor: pointer;
+      outline: none;
+    }
+    .sort-select:focus { border-color: #1a73e8; }
+
+    /* Breadcrumb */
+    .breadcrumb {
+      padding: 10px 24px;
+      display: flex;
+      align-items: center;
+      gap: 2px;
+      flex-wrap: wrap;
+      background: #fafafa;
+      border-bottom: 1px solid #f0f0f0;
+    }
+    .bc-item {
+      font-size: 14px;
+      color: #1a73e8;
+      cursor: pointer;
+      padding: 3px 7px;
+      border-radius: 5px;
+    }
+    .bc-item:hover { background: #e8f0fe; }
+    .bc-item.current { color: #333; cursor: default; font-weight: 600; }
+    .bc-item.current:hover { background: transparent; }
+    .bc-sep { color: #bbb; font-size: 14px; padding: 0 2px; }
+
+    /* File List */
+    .file-container { padding: 16px 24px 32px; flex: 1; }
+    .file-list {
+      background: white;
+      border-radius: 12px;
+      border: 1px solid #e0e0e0;
+      overflow: hidden;
+    }
+    .file-list-header {
+      display: grid;
+      grid-template-columns: 36px 1fr 150px 150px 90px;
+      padding: 9px 16px;
+      background: #f8f9fa;
+      border-bottom: 1px solid #e8e8e8;
+      font-size: 11px;
+      font-weight: 700;
+      color: #888;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+    }
+    .file-item {
+      display: grid;
+      grid-template-columns: 36px 1fr 150px 150px 90px;
+      padding: 9px 16px;
+      border-bottom: 1px solid #f5f5f5;
+      align-items: center;
+      cursor: pointer;
+      transition: background 0.1s;
+    }
+    .file-item:last-child { border-bottom: none; }
+    .file-item:hover { background: #f8fbff; }
+    .file-icon { font-size: 22px; line-height: 1; }
+    .file-name {
+      font-size: 14px;
+      font-weight: 500;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      padding-right: 12px;
+    }
+    .file-date { font-size: 12px; color: #777; }
+    .file-actions {
+      display: flex;
+      gap: 2px;
+      opacity: 0;
+      transition: opacity 0.15s;
+    }
+    .file-item:hover .file-actions { opacity: 1; }
+
+    /* States */
+    .loading, .empty-state {
+      padding: 56px 24px;
+      text-align: center;
+      color: #aaa;
+    }
+    .spinner {
+      width: 30px; height: 30px;
+      border: 3px solid #e8e8e8;
+      border-top-color: #1a73e8;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      margin: 0 auto 12px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .empty-state .empty-icon { font-size: 44px; margin-bottom: 12px; }
+    .empty-state p { font-size: 15px; }
+
+    /* Modal */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.35);
+      z-index: 200;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .modal-overlay.hidden { display: none; }
+    .modal {
+      background: white;
+      border-radius: 14px;
+      padding: 28px;
+      width: 92%;
+      max-width: 460px;
+      box-shadow: 0 8px 40px rgba(0,0,0,0.18);
+      display: flex;
+      flex-direction: column;
+    }
+    .modal h2 { font-size: 17px; margin-bottom: 18px; }
+    .modal-input {
+      width: 100%;
+      padding: 10px 13px;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      font-size: 14px;
+      margin-bottom: 18px;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    .modal-input:focus { border-color: #1a73e8; box-shadow: 0 0 0 3px rgba(26,115,232,0.1); }
+    .modal-actions { display: flex; gap: 8px; justify-content: flex-end; }
+    .folder-pick-list {
+      flex: 1;
+      overflow-y: auto;
+      border: 1px solid #e0e0e0;
+      border-radius: 8px;
+      margin-bottom: 18px;
+      max-height: 280px;
+    }
+    .folder-pick-item {
+      padding: 10px 16px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 14px;
+      border-bottom: 1px solid #f5f5f5;
+      transition: background 0.1s;
+    }
+    .folder-pick-item:last-child { border-bottom: none; }
+    .folder-pick-item:hover { background: #f0f6ff; }
+    .folder-pick-item.selected { background: #e8f0fe; font-weight: 600; color: #1a73e8; }
+
+    /* Toast */
+    .toast {
+      position: fixed;
+      bottom: 28px;
+      left: 50%;
+      transform: translateX(-50%) translateY(8px);
+      background: #323232;
+      color: white;
+      padding: 11px 22px;
+      border-radius: 8px;
+      font-size: 14px;
+      z-index: 300;
+      opacity: 0;
+      transition: opacity 0.25s, transform 0.25s;
+      pointer-events: none;
+    }
+    .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+    /* Responsive */
+    @media (max-width: 640px) {
+      .file-list-header,
+      .file-item { grid-template-columns: 32px 1fr 80px; }
+      .col-created, .col-modified-h, .col-created-h { display: none; }
+      .header h1 { font-size: 15px; }
+      .toolbar { padding: 8px 12px; }
+      .file-container { padding: 12px; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ログイン画面 -->
+<div id="login-screen">
+  <div class="login-card">
+    <div class="logo">📂</div>
+    <h1>ドライブマネージャー</h1>
+    <p>Googleドライブのファイルを<br>見やすく・整理しやすく</p>
+    <button class="btn btn-primary" onclick="signIn()" style="width:100%;justify-content:center;padding:12px;">
+      Googleでサインイン
+    </button>
+  </div>
+</div>
+
+<!-- メインアプリ -->
+<div id="app">
+  <header class="header">
+    <div class="header-left">
+      <span class="header-logo">📂</span>
+      <h1>ドライブマネージャー</h1>
+    </div>
+    <div class="header-right">
+      <span class="user-email" id="user-email"></span>
+      <button class="btn btn-secondary" onclick="signOut()">サインアウト</button>
+    </div>
+  </header>
+
+  <div class="toolbar">
+    <button class="btn btn-primary" onclick="showCreateDocModal()">📄 新規ドキュメント</button>
+    <button class="btn btn-secondary" onclick="showCreateFolderModal()">📁 新規フォルダ</button>
+    <div class="toolbar-spacer"></div>
+    <span class="sort-label">並び替え:</span>
+    <select class="sort-select" id="sort-select" onchange="loadFiles()">
+      <option value="name-asc">名前 (A→Z)</option>
+      <option value="name-desc">名前 (Z→A)</option>
+      <option value="modifiedTime-desc" selected>更新日時 (新しい順)</option>
+      <option value="modifiedTime-asc">更新日時 (古い順)</option>
+      <option value="createdTime-desc">作成日時 (新しい順)</option>
+      <option value="createdTime-asc">作成日時 (古い順)</option>
+    </select>
+    <button class="btn btn-icon" onclick="loadFiles()" title="更新">🔄</button>
+  </div>
+
+  <div class="breadcrumb" id="breadcrumb"></div>
+
+  <div class="file-container">
+    <div class="file-list" id="file-list">
+      <div class="loading"><div class="spinner"></div><p>読み込み中...</p></div>
+    </div>
+  </div>
+</div>
+
+<!-- 新規ドキュメント モーダル -->
+<div class="modal-overlay hidden" id="modal-create-doc">
+  <div class="modal">
+    <h2>📄 新規ドキュメントを作成</h2>
+    <input class="modal-input" id="input-doc-name" placeholder="ドキュメント名" type="text">
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeModal('modal-create-doc')">キャンセル</button>
+      <button class="btn btn-primary" onclick="createDoc()">作成して開く</button>
+    </div>
+  </div>
+</div>
+
+<!-- 新規フォルダ モーダル -->
+<div class="modal-overlay hidden" id="modal-create-folder">
+  <div class="modal">
+    <h2>📁 新規フォルダを作成</h2>
+    <input class="modal-input" id="input-folder-name" placeholder="フォルダ名" type="text">
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeModal('modal-create-folder')">キャンセル</button>
+      <button class="btn btn-primary" onclick="createFolder()">作成</button>
+    </div>
+  </div>
+</div>
+
+<!-- 移動先フォルダ選択 モーダル -->
+<div class="modal-overlay hidden" id="modal-move">
+  <div class="modal" style="max-height:75vh;">
+    <h2>📦 フォルダへ移動</h2>
+    <p style="font-size:13px;color:#777;margin-bottom:12px;">移動先フォルダを選んでください</p>
+    <div class="folder-pick-list" id="folder-pick-list"></div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeModal('modal-move')">キャンセル</button>
+      <button class="btn btn-primary" id="btn-confirm-move" onclick="confirmMove()" disabled>移動する</button>
+    </div>
+  </div>
+</div>
+
+<!-- トースト通知 -->
+<div class="toast" id="toast"></div>
+
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<script>
+const CLIENT_ID = '375097358246-2sjtq12big26jbfivbph1hr881m62qpq.apps.googleusercontent.com';
+const SCOPE = 'https://www.googleapis.com/auth/drive';
+
+let accessToken = null;
+let tokenClient = null;
+let currentFolderId = 'root';
+let breadcrumb = [{ id: 'root', name: 'マイドライブ' }];
+let moveFileId = null;
+let moveOldParentId = null;
+let moveSelectedFolderId = null;
+
+// GIS の初期化
+window.addEventListener('load', () => {
+  const wait = setInterval(() => {
+    if (window.google?.accounts?.oauth2) {
+      clearInterval(wait);
+      tokenClient = google.accounts.oauth2.initTokenClient({
+        client_id: CLIENT_ID,
+        scope: SCOPE,
+        callback: onToken,
+      });
+    }
+  }, 100);
+});
+
+function onToken(resp) {
+  if (resp.error) { showToast('認証エラー: ' + resp.error); return; }
+  accessToken = resp.access_token;
+  fetchUserInfo();
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('app').classList.add('active');
+  loadFiles();
+}
+
+async function fetchUserInfo() {
+  try {
+    const r = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
+      headers: { Authorization: `Bearer ${accessToken}` }
+    });
+    const u = await r.json();
+    document.getElementById('user-email').textContent = u.email || '';
+  } catch {}
+}
+
+function signIn() {
+  if (!tokenClient) { showToast('しばらく待ってから再試行してください'); return; }
+  tokenClient.requestAccessToken({ prompt: 'consent' });
+}
+
+function signOut() {
+  if (accessToken) google.accounts.oauth2.revoke(accessToken);
+  accessToken = null;
+  currentFolderId = 'root';
+  breadcrumb = [{ id: 'root', name: 'マイドライブ' }];
+  document.getElementById('app').classList.remove('active');
+  document.getElementById('login-screen').style.display = 'flex';
+}
+
+// Drive API
+async function api(path, opts = {}) {
+  const r = await fetch(`https://www.googleapis.com/drive/v3/${path}`, {
+    ...opts,
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+      ...(opts.headers || {})
+    }
+  });
+  if (r.status === 401) { signOut(); return null; }
+  if (r.status === 204 || r.status === 200 && r.headers.get('content-length') === '0') return null;
+  const json = await r.json();
+  if (!r.ok) throw new Error(json.error?.message || `HTTP ${r.status}`);
+  return json;
+}
+
+// ファイル読み込み
+async function loadFiles() {
+  setFileList(`<div class="loading"><div class="spinner"></div><p>読み込み中...</p></div>`);
+  try {
+    const [field, dir] = document.getElementById('sort-select').value.split('-');
+    const orderBy = dir === 'desc' ? `${field} desc` : field;
+    const p = new URLSearchParams({
+      q: `'${currentFolderId}' in parents and trashed = false`,
+      fields: 'files(id,name,mimeType,modifiedTime,createdTime)',
+      orderBy,
+      pageSize: '500'
+    });
+    const data = await api(`files?${p}`);
+    if (data) renderFiles(data.files || []);
+  } catch(e) {
+    setFileList(`<div class="empty-state"><div class="empty-icon">⚠️</div><p style="color:#e53935">${escHtml(e.message)}</p><button class="btn btn-secondary" style="margin-top:16px" onclick="loadFiles()">再試行</button></div>`);
+  }
+}
+
+function renderFiles(files) {
+  renderBreadcrumb();
+  if (!files.length) {
+    setFileList(`<div class="empty-state"><div class="empty-icon">📭</div><p>ファイルがありません</p></div>`);
+    return;
+  }
+  // フォルダを先に
+  const sorted = [
+    ...files.filter(f => f.mimeType === 'application/vnd.google-apps.folder'),
+    ...files.filter(f => f.mimeType !== 'application/vnd.google-apps.folder'),
+  ];
+  const rows = sorted.map(f => {
+    const isFolder = f.mimeType === 'application/vnd.google-apps.folder';
+    const icon = fileIcon(f.mimeType);
+    const mod = f.modifiedTime ? fmtDate(f.modifiedTime) : '-';
+    const cre = f.createdTime ? fmtDate(f.createdTime) : '-';
+    const n = escHtml(f.name);
+    const id = escHtml(f.id);
+    const pid = escHtml(currentFolderId);
+    const click = isFolder
+      ? `openFolder('${id}','${n.replace(/'/g,"\\'")}')`
+      : `openFile('${id}','${escHtml(f.mimeType)}')`;
+    return `
+      <div class="file-item" onclick="${click}">
+        <div class="file-icon">${icon}</div>
+        <div class="file-name" title="${n}">${n}</div>
+        <div class="file-date">${mod}</div>
+        <div class="file-date col-created">${cre}</div>
+        <div class="file-actions" onclick="event.stopPropagation()">
+          ${!isFolder ? `<button class="btn btn-icon" title="フォルダへ移動" onclick="showMoveModal('${id}','${pid}')">📦</button>` : ''}
+          <button class="btn btn-icon" title="ゴミ箱へ" onclick="trashFile('${id}','${n.replace(/'/g,"\\'")}')">🗑️</button>
+        </div>
+      </div>`;
+  }).join('');
+
+  setFileList(`
+    <div class="file-list-header">
+      <div></div><div>名前</div>
+      <div>更新日時</div>
+      <div class="col-modified-h">作成日時</div>
+      <div>操作</div>
+    </div>${rows}`);
+}
+
+function renderBreadcrumb() {
+  document.getElementById('breadcrumb').innerHTML = breadcrumb.map((item, i) => {
+    const last = i === breadcrumb.length - 1;
+    const sep = i > 0 ? '<span class="bc-sep">›</span>' : '';
+    return `${sep}<span class="bc-item${last?' current':''}" ${last?'':  `onclick="navigateTo(${i})"`}>${escHtml(item.name)}</span>`;
+  }).join('');
+}
+
+function openFolder(id, name) {
+  currentFolderId = id;
+  breadcrumb.push({ id, name });
+  loadFiles();
+}
+
+function navigateTo(i) {
+  breadcrumb = breadcrumb.slice(0, i + 1);
+  currentFolderId = breadcrumb[i].id;
+  loadFiles();
+}
+
+function openFile(id, mime) {
+  const url = mime === 'application/vnd.google-apps.document'
+    ? `https://docs.google.com/document/d/${id}/edit`
+    : `https://drive.google.com/file/d/${id}/view`;
+  window.open(url, '_blank');
+}
+
+// 新規ドキュメント
+function showCreateDocModal() {
+  document.getElementById('input-doc-name').value = '';
+  openModal('modal-create-doc');
+  setTimeout(() => document.getElementById('input-doc-name').focus(), 80);
+}
+async function createDoc() {
+  const name = document.getElementById('input-doc-name').value.trim();
+  if (!name) { showToast('名前を入力してください'); return; }
+  closeModal('modal-create-doc');
+  showToast('作成中...');
+  try {
+    const d = await api('files', {
+      method: 'POST',
+      body: JSON.stringify({ name, mimeType: 'application/vnd.google-apps.document', parents: [currentFolderId] })
+    });
+    showToast('✅ 作成しました');
+    loadFiles();
+    if (d?.id) setTimeout(() => window.open(`https://docs.google.com/document/d/${d.id}/edit`, '_blank'), 400);
+  } catch(e) { showToast('エラー: ' + e.message); }
+}
+
+// 新規フォルダ
+function showCreateFolderModal() {
+  document.getElementById('input-folder-name').value = '';
+  openModal('modal-create-folder');
+  setTimeout(() => document.getElementById('input-folder-name').focus(), 80);
+}
+async function createFolder() {
+  const name = document.getElementById('input-folder-name').value.trim();
+  if (!name) { showToast('名前を入力してください'); return; }
+  closeModal('modal-create-folder');
+  showToast('作成中...');
+  try {
+    await api('files', {
+      method: 'POST',
+      body: JSON.stringify({ name, mimeType: 'application/vnd.google-apps.folder', parents: [currentFolderId] })
+    });
+    showToast('✅ フォルダを作成しました');
+    loadFiles();
+  } catch(e) { showToast('エラー: ' + e.message); }
+}
+
+// 移動
+async function showMoveModal(fileId, parentId) {
+  moveFileId = fileId;
+  moveOldParentId = parentId;
+  moveSelectedFolderId = null;
+  document.getElementById('btn-confirm-move').disabled = true;
+  document.getElementById('folder-pick-list').innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+  openModal('modal-move');
+  try {
+    const p = new URLSearchParams({
+      q: "mimeType='application/vnd.google-apps.folder' and trashed=false",
+      fields: 'files(id,name)',
+      orderBy: 'name',
+      pageSize: '200'
+    });
+    const data = await api(`files?${p}`);
+    if (!data) return;
+    const folders = [{ id: 'root', name: '📂 マイドライブ (ルート)' }, ...(data.files || []).map(f => ({ id: f.id, name: '📁 ' + f.name }))].filter(f => f.id !== parentId);
+    if (!folders.length) {
+      document.getElementById('folder-pick-list').innerHTML = '<div style="padding:16px;text-align:center;color:#aaa">移動先がありません</div>';
+      return;
+    }
+    document.getElementById('folder-pick-list').innerHTML = folders.map(f =>
+      `<div class="folder-pick-item" onclick="pickFolder('${escHtml(f.id)}',this)">${escHtml(f.name)}</div>`
+    ).join('');
+  } catch(e) {
+    document.getElementById('folder-pick-list').innerHTML = `<div style="padding:16px;color:#e53935">エラー: ${escHtml(e.message)}</div>`;
+  }
+}
+function pickFolder(id, el) {
+  document.querySelectorAll('.folder-pick-item').forEach(e => e.classList.remove('selected'));
+  el.classList.add('selected');
+  moveSelectedFolderId = id;
+  document.getElementById('btn-confirm-move').disabled = false;
+}
+async function confirmMove() {
+  if (!moveSelectedFolderId) return;
+  closeModal('modal-move');
+  showToast('移動中...');
+  try {
+    await api(`files/${moveFileId}?addParents=${moveSelectedFolderId}&removeParents=${moveOldParentId}&fields=id`, {
+      method: 'PATCH',
+      body: JSON.stringify({})
+    });
+    showToast('✅ 移動しました');
+    loadFiles();
+  } catch(e) { showToast('エラー: ' + e.message); }
+}
+
+// 削除 (ゴミ箱へ)
+async function trashFile(id, name) {
+  if (!confirm(`「${name}」をゴミ箱に移しますか？`)) return;
+  showToast('削除中...');
+  try {
+    await api(`files/${id}`, { method: 'PATCH', body: JSON.stringify({ trashed: true }) });
+    showToast('✅ ゴミ箱に移動しました');
+    loadFiles();
+  } catch(e) { showToast('エラー: ' + e.message); }
+}
+
+// ユーティリティ
+function fileIcon(mime) {
+  const m = {
+    'application/vnd.google-apps.folder': '📁',
+    'application/vnd.google-apps.document': '📝',
+    'application/vnd.google-apps.spreadsheet': '📊',
+    'application/vnd.google-apps.presentation': '📑',
+    'application/vnd.google-apps.form': '📋',
+    'application/pdf': '📕',
+  };
+  if (m[mime]) return m[mime];
+  if (mime?.startsWith('image/')) return '🖼️';
+  if (mime?.startsWith('video/')) return '🎬';
+  if (mime?.startsWith('audio/')) return '🎵';
+  return '📄';
+}
+function fmtDate(iso) {
+  const d = new Date(iso);
+  return d.toLocaleDateString('ja-JP', { year: 'numeric', month: '2-digit', day: '2-digit' })
+    + ' ' + d.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
+}
+function escHtml(s) {
+  return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+function setFileList(html) { document.getElementById('file-list').innerHTML = html; }
+function openModal(id) { document.getElementById(id).classList.remove('hidden'); }
+function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
+
+let toastTimer;
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+// キーボード操作
+document.addEventListener('keydown', e => {
+  if (e.key === 'Enter') {
+    if (!document.getElementById('modal-create-doc').classList.contains('hidden')) createDoc();
+    else if (!document.getElementById('modal-create-folder').classList.contains('hidden')) createFolder();
+  }
+  if (e.key === 'Escape') {
+    ['modal-create-doc','modal-create-folder','modal-move'].forEach(closeModal);
+  }
+});
+document.querySelectorAll('.modal-overlay').forEach(o => {
+  o.addEventListener('click', e => {
+    if (e.target === o) ['modal-create-doc','modal-create-folder','modal-move'].forEach(closeModal);
+  });
+});
+</script>
+</body>
+</html>
