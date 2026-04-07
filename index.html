@@ -407,7 +407,8 @@ window.addEventListener('load', () => {
 
 function onToken(resp) {
   if (resp.error) {
-    localStorage.removeItem('drive_autologin');
+    // サイレント認証失敗 → ログイン画面を表示するだけ（フラグは消さない）
+    document.getElementById('login-screen').style.display = 'flex';
     return;
   }
   accessToken = resp.access_token;
