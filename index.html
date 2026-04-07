@@ -397,13 +397,21 @@ window.addEventListener('load', () => {
         scope: SCOPE,
         callback: onToken,
       });
+      // 前回ログインしていたら自動サインイン
+      if (localStorage.getItem('drive_autologin')) {
+        tokenClient.requestAccessToken({ prompt: '' });
+      }
     }
   }, 100);
 });
 
 function onToken(resp) {
-  if (resp.error) { showToast('認証エラー: ' + resp.error); return; }
+  if (resp.error) {
+    localStorage.removeItem('drive_autologin');
+    return;
+  }
   accessToken = resp.access_token;
+  localStorage.setItem('drive_autologin', '1');
   fetchUserInfo();
   document.getElementById('login-screen').style.display = 'none';
   document.getElementById('app').classList.add('active');
@@ -428,6 +436,7 @@ function signIn() {
 function signOut() {
   if (accessToken) google.accounts.oauth2.revoke(accessToken);
   accessToken = null;
+  localStorage.removeItem('drive_autologin');
   currentFolderId = 'root';
   breadcrumb = [{ id: 'root', name: 'マイドライブ' }];
   document.getElementById('app').classList.remove('active');
@@ -458,7 +467,7 @@ async function loadFiles() {
     const [field, dir] = document.getElementById('sort-select').value.split('-');
     const orderBy = dir === 'desc' ? `${field} desc` : field;
     const p = new URLSearchParams({
-      q: `'${currentFolderId}' in parents and trashed = false`,
+      q: `'${currentFolderId}' in parents and trashed = false and (mimeType = 'application/vnd.google-apps.folder' or mimeType = 'application/vnd.google-apps.document' or mimeType = 'application/vnd.google-apps.spreadsheet')`,
       fields: 'files(id,name,mimeType,modifiedTime,createdTime)',
       orderBy,
       pageSize: '500'
